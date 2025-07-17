@@ -62,6 +62,8 @@ export function AppSidebarUser({
       }),
     {
       refreshIntervalOnFocus: false,
+      focusThrottleInterval: 1000 * 60 * 5,
+      revalidateOnFocus: false,
       refreshWhenHidden: true,
       refreshInterval: 1000 * 60 * 5,
     },

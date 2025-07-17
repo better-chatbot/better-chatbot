@@ -261,7 +261,7 @@ export function AppSidebarThreads() {
                           beforeTitle={thread.title}
                         >
                           <div className="flex items-center data-[state=open]:bg-input! group-hover/thread:bg-input! rounded-lg">
-                            <Tooltip>
+                            <Tooltip delayDuration={1000}>
                               <TooltipTrigger asChild>
                                 <SidebarMenuButton
                                   asChild
