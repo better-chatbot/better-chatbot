@@ -5,9 +5,13 @@ WORKDIR /app
 COPY . . 
 
 # Install pnpm
-RUN npm install -g pnpm
+RUN corepack enable pnpm
 
 RUN pnpm install --frozen-lockfile
+
+# Makes the next output standalone
+# https://github.com/vercel/next.js/discussions/65511
+ENV NEXT_STANDALONE_OUTPUT="true"
 
 RUN pnpm build
 
@@ -15,28 +19,30 @@ FROM node:23-alpine AS runner
 
 WORKDIR /app
 
-RUN npm install -g pnpm
+ENV NODE_ENV=production
+# disable telemetry during runtime.
+ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN apk add --no-cache curl bash \
-    && curl -fsSL https://bun.sh/install | bash \
-    && ln -s /root/.bun/bin/bun /usr/local/bin/bun
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
 
-# Add the UV installation steps
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+COPY --from=builder /app/public ./public
 
-# Copy the build output from the builder stage
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/public ./public/
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
-COPY --from=builder /app/scripts/db-migrate.ts ./scripts/db-migrate.ts
-COPY --from=builder /app/src/lib/db/pg/migrate.pg.ts ./src/lib/db/pg/migrate.pg.ts
-COPY --from=builder /app/src/lib/utils.ts ./src/lib/utils.ts
-COPY --from=builder /app/src/lib/load-env.ts ./src/lib/load-env.ts
+# Automatically leverage output traces to reduce image size
+# https://nextjs.org/docs/advanced-features/output-file-tracing
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Copy migrations content
 COPY --from=builder /app/src/lib/db/migrations ./src/lib/db/migrations
-COPY --from=builder /app/src/types/chat.ts ./src/types/chat.ts
-COPY --from=builder /app/messages ./messages
+
+USER nextjs
+
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
+
 EXPOSE 3000
 
-CMD pnpm start
+# server.js is created by next build from the standalone output
+# https://nextjs.org/docs/pages/api-reference/config/next-config-js/output
+CMD ["node", "server.js"]
